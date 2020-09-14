@@ -1,14 +1,17 @@
 document.addEventListener('deviceready', onDeviceReady, false);	
 function onDeviceReady() {   	
-    AudioPlayer.initialize().then(() => {
-        window.alert('initialized')
-    });
 
-    const checkInitBtn = document.querySelector('.checkInitBtn');
-    checkInitBtn.addEventListener('click', () => {
-        AudioPlayer.checkInit().then(() => {
-            window.alert('initialized!!');
+
+    const createBtn = document.querySelector('.createBtn');
+    createBtn.addEventListener('click', async() => {
+        const player1 = await AudioPlayerManager.create({
+            id: 'hoge',
+            url: 'hoge',
+            isLoop: false
         });
+
+        console.log(player1);
+
     });
 
 }
