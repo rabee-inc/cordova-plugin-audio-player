@@ -58,10 +58,14 @@ class AudioPlayerManager {
 
 class AudioPlayer {
 
-  constructor(params) {
-    this.id = params.id; // id
-    this.path = params.path; // file path
-    this.duration = params.duration; // 長さ
+  constructor({id, path, duration}) {
+    this.id = id; // id
+    this.path = path; // file path
+    this.duration = duration; // 長さ
+
+
+    this.exec = require('cordova/exec');
+    this._listeners = {};
 
     //　イベント登録
     this.registerEvents('play', 'setOnPlayCallbackId', {id});
@@ -69,8 +73,6 @@ class AudioPlayer {
     this.registerEvents('stop', 'setOnStopCallbackId', {id});
     this.registerEvents('ended', 'setOnEndedCallbackId', {id});
 
-    this.exec = require('cordova/exec');
-    this._listeners = {};
   }
 
   // 音楽再生
@@ -153,6 +155,5 @@ class AudioPlayer {
   };
 
 }
-
 
 module.exports = new AudioPlayerManager();
