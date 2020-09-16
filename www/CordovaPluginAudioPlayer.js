@@ -6,11 +6,10 @@ class AudioPlayerManager {
     this.players = [];
   }
 
-  async create({id, url, isLoop}) {
-
-    await this.createAction('create', {id, url, isLoop})
-
-    const player = new AudioPlayer({id})
+  async create({id, path, isLoop}) {
+    // id, path, duration
+    const data = await this.createAction('create', {id, path, isLoop});
+    const player = new AudioPlayer(data);
     this.players.push(player);
 
     return player;
@@ -60,7 +59,16 @@ class AudioPlayerManager {
 class AudioPlayer {
 
   constructor(params) {
-    this.id = params.id;
+    this.id = params.id; // id
+    this.path = params.path; // file path
+    this.duration = params.duration; // 長さ
+
+    //　イベント登録
+    this.registerEvents('play', 'setOnPlayCallbackId', {id});
+    this.registerEvents('pause', 'setOnPauseCallbackId', {id});
+    this.registerEvents('stop', 'setOnStopCallbackId', {id});
+    this.registerEvents('ended', 'setOnEndedCallbackId', {id});
+
     this.exec = require('cordova/exec');
     this._listeners = {};
   }
@@ -68,6 +76,21 @@ class AudioPlayer {
   // 音楽再生
   play() {
     this.createAction('play', {id: this.id});
+  }
+  // 音楽一時停止
+  pause() {
+    this.createAction('pause', {id: this.id});
+  }
+  // 音楽停止
+  stop() {
+    this.createAction('stop', {id: this.id});
+  }
+  // 音楽停止
+  getCurrentTime() {
+    this.createAction('stop', {id: this.id});
+  }
+  setCurrentTime() {
+    this.createAction('setCurrentTime', {id: this.id});
   }
 
   // 登録関係
@@ -116,8 +139,7 @@ class AudioPlayer {
   registerCordovaExecuter(action, onSuccess, onFail, param) {
     return this.exec(onSuccess, onFail, 'CDVPluginAudioPlayer', action, [param]);
   };
-
-
+  
   // イベントをバインド
   registerEvents(onSuccess, action, params) {
     this.exec(
