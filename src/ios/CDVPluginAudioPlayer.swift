@@ -26,10 +26,10 @@ struct PlayerData {
     init(data: [String: Any]) throws {
         guard
             let id = data["id"] as? String,
-            let path = data["path"] as? String,
-            let isLoop = data["isLoop"] as? Bool else {
+            let path = data["path"] as? String else {
                 throw NSError(domain: "initalize error", code: 1, userInfo: nil)
         }
+        let isLoop = data["isLoop"] as? Bool ?? false
         
         self.id = id
         self.isLoop = isLoop
@@ -46,7 +46,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     init(path:String) {
         super.init()
         do {
-            audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
+            
+            let regularURL = path.replacingOccurrences(of: "file://", with: "")
+            audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: regularURL))
             audioPlayer.delegate = self
 //            audioPlayer.prepareToPlay() // バッファを読み込んでおく
         }
@@ -56,6 +58,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func play() {
+        
+        
         if (audioPlayer.isPlaying) {
             return
         }
@@ -115,7 +119,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
 
 // マネージャー的なやつ
-@objc(CDVPluginAudioPlayer ) class CDVPluginAudioPlayer: CDVPlugin {
+@objc(CDVPluginAudioPlayer) class CDVPluginAudioPlayer: CDVPlugin {
 
     var playerDataList:[String:PlayerData] = [:]
     
@@ -129,6 +133,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidStop(notification:)), name: NSNotification.Name.audioPlayerStop, object: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidEnded(notification:)), name: NSNotification.Name.audioPlayerEnded, object: nil)
+        playerDataList = [:]
     }
     
     // 作成
@@ -137,7 +142,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         do {
             var playerData = try PlayerData(data: data)
             playerData.delegate = self
-            playerDataList[playerData.id] = playerData
+            
+            playerDataList.updateValue(playerData, forKey: playerData.id)
         
             let data = [
                 "id": playerData.id,
@@ -227,6 +233,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? String,
             var playerData = playerDataList[id] else {return}
         playerData.playCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
         
     }
     @objc func setOnPauseCallbackId(_ command: CDVInvokedUrlCommand) {
@@ -235,6 +242,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? String,
             var playerData = playerDataList[id] else {return}
         playerData.pauseCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
         
     }
     @objc func setOnStopCallbackId(_ command: CDVInvokedUrlCommand) {
@@ -243,6 +251,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? String,
             var playerData = playerDataList[id] else {return}
         playerData.stopCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
         
     }
     @objc func setOnEndedCallbackId(_ command: CDVInvokedUrlCommand) {
@@ -251,6 +260,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? String,
             var playerData = playerDataList[id] else {return}
         playerData.endedCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
         
     }
     @objc func setOnCanPlayCallbackId(_ command: CDVInvokedUrlCommand) {
@@ -259,37 +269,44 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? String,
             var playerData = playerDataList[id] else {return}
         playerData.canPlayCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
         
     }
     
     // 通知受け取り関数
     @objc func audioDidCanPlay(notification: Notification) {
-        guard let playerData = notification.userInfo?["playerData"] as? PlayerData else {return}
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
     @objc func audioDidPlay(notification: Notification) {
-        guard let playerData = notification.userInfo?["playerData"] as? PlayerData else {return}
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
     @objc func audioDidPause(notification: Notification) {
-        guard let playerData = notification.userInfo?["playerData"] as? PlayerData else {return}
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
         commandDelegate.send(result, callbackId: playerData.pauseCallbackId)
     }
     
     @objc func audioDidStop(notification: Notification) {
-        guard let playerData = notification.userInfo?["playerData"] as? PlayerData else {return}
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
         commandDelegate.send(result, callbackId: playerData.stopCallbackId)
     }
     
     @objc func audioDidEnded(notification: Notification) {
-        guard let playerData = notification.userInfo?["playerData"] as? PlayerData else {return}
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.endedCallbackId)
     }
     
