@@ -244,8 +244,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
-        let duration = playerData.player.getDuration()
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["duration": duration])
+        let time = playerData.player.getCurrentTime()
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": time])
         commandDelegate.send(result, callbackId: command.callbackId)
     }
     
