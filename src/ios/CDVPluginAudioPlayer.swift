@@ -9,7 +9,7 @@ extension Notification.Name {
 
 // player の wrapper クラス
 struct PlayerData {
-    var id: String
+    var id: Int
     var isLoop: Bool // ループするかどうか -> まだ未実装
     var player: AudioPlayer
     var path: String
@@ -22,13 +22,12 @@ struct PlayerData {
     var endedCallbackId: String?
     var canPlayCallbackId: String?
 
-    
-    init(data: [String: Any]) throws {
+    init(data: [String: Any], id: Int) throws {
         guard
-            let id = data["id"] as? String,
             let path = data["path"] as? String else {
                 throw NSError(domain: "initalize error", code: 1, userInfo: nil)
         }
+        self.id = id
         let isLoop = data["isLoop"] as? Bool ?? false
         
         self.id = id
@@ -121,8 +120,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 // マネージャー的なやつ
 @objc(CDVPluginAudioPlayer) class CDVPluginAudioPlayer: CDVPlugin {
 
-    var playerDataList:[String:PlayerData] = [:]
-    
+    var playerDataList:[Int:PlayerData] = [:]
+    var audioIndex: Int = 0
+    private var lock = NSRecursiveLock()
     
     @objc override func pluginInitialize() {
         // 通知登録 (play, pause, stop, ended)
@@ -134,17 +134,23 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidEnded(notification:)), name: NSNotification.Name.audioPlayerEnded, object: nil)
         playerDataList = [:]
+        audioIndex = 0
+        lock = NSRecursiveLock()
     }
     
     // 作成
     @objc func create(_ command: CDVInvokedUrlCommand) {
-        let data = command.argument(at: 0) as! [String: Any]
-        do {
-            var playerData = try PlayerData(data: data)
-            playerData.delegate = self
-            
-            playerDataList.updateValue(playerData, forKey: playerData.id)
+        // 作成終わるまで待つ
+        defer { lock.unlock() }
+        lock.lock()
         
+        let data = command.argument(at: 0) as! [String: Any]
+        audioIndex = audioIndex + 1
+        let id = audioIndex
+        do {
+            var playerData = try PlayerData(data: data, id: id);
+            playerData.delegate = self
+            playerDataList.updateValue(playerData, forKey: playerData.id)
             let data = [
                 "id": playerData.id,
                 "path": playerData.path as Any,
@@ -164,7 +170,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -190,7 +196,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -204,7 +210,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -218,7 +224,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
         let duration = playerData.player.getDuration()
@@ -230,7 +236,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             let playerData = playerDataList[id] else {return}
         
         let duration = playerData.player.getDuration()
@@ -242,7 +248,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnPlayCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             var playerData = playerDataList[id] else {return}
         playerData.playCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -251,7 +257,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnPauseCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             var playerData = playerDataList[id] else {return}
         playerData.pauseCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -260,7 +266,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnStopCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             var playerData = playerDataList[id] else {return}
         playerData.stopCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -269,7 +275,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnEndedCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             var playerData = playerDataList[id] else {return}
         playerData.endedCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -278,7 +284,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnCanPlayCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? String,
+            let id = data["id"] as? Int,
             var playerData = playerDataList[id] else {return}
         playerData.canPlayCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
