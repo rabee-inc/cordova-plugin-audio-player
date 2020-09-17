@@ -6,12 +6,12 @@ class AudioPlayerManager {
     this.players = [];
   }
 
-  async create({id, path, isLoop}) {
+  async create({path, isLoop}) {
     // id, path, duration
-    const data = await this.createAction('create', {id, path, isLoop});
+    const data = await this.createAction('create', {path, isLoop});
     const player = new AudioPlayer(data);
     this.players.push(player);
-
+  
     return player;
   }
 
