@@ -285,7 +285,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
+        result?.keepCallback = true 
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
