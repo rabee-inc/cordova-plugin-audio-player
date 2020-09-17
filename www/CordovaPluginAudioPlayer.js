@@ -76,23 +76,22 @@ class AudioPlayer {
   }
 
   // 音楽再生
-  play() {
-    this.createAction('play', {id: this.id});
+  play(time) {
+    return this.createAction('play', {id: this.id, time});
   }
   // 音楽一時停止
   pause() {
-    this.createAction('pause', {id: this.id});
+    return this.createAction('pause', {id: this.id});
   }
   // 音楽停止
   stop() {
-    this.createAction('stop', {id: this.id});
+    return this.createAction('stop', {id: this.id});
   }
-  // 音楽停止
   getCurrentTime() {
-    this.createAction('stop', {id: this.id});
+    return this.createAction('getCurrentTime', {id: this.id});
   }
-  setCurrentTime() {
-    this.createAction('setCurrentTime', {id: this.id});
+  setCurrentTime(time) {
+    return this.createAction('setCurrentTime', {id: this.id, time});
   }
 
   // 登録関係
@@ -101,7 +100,7 @@ class AudioPlayer {
     this._listeners[event].push(callback);
   };
   off(event, callback) {
-    if (!this._listeners[event]) this._listenerss[event] = [];
+    if (!this._listeners[event]) this._listeners[event] = [];
     if (event && typeof callback === 'function') {
       var i = this._listeners[event].indexOf(callback);
       if (i !== -1) {
@@ -125,10 +124,11 @@ class AudioPlayer {
 
   // ========================== private 関数 ==============================================
   // promise で返す。 cordova の excuter の wrapper
-  createAction(action, params) {
+  createAction(action, params = {}) {
     return new Promise((resolve, reject) => {
       // actionが定義されているかを判定したい
       if (true) {
+        params.timestamp = Date.now() / 1000;
         // cordova 実行ファイルを登録
         this.registerCordovaExecuter(action, resolve, reject, params);
       }

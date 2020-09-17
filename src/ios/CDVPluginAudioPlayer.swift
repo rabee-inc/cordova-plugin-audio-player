@@ -168,7 +168,19 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
-        player.play()
+        var time = data["time"] as? Double
+
+        let date: Date = Date()
+        if (time != nil) {
+            let swiftUnixTime: Double = Double(date.timeIntervalSince1970)
+            let jsUnixTime: Double = data["timestamp"] as! Double
+            // コマンド呼び出しのラグを修正
+            time! -= swiftUnixTime - jsUnixTime;
+            player.play(time: time ?? 0)
+        }
+        else {
+            player.play()
+        }
         
         let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
         commandDelegate.send(result, callbackId: command.callbackId)
