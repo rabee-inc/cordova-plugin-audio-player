@@ -33,8 +33,9 @@ struct PlayerData {
         self.id = id
         self.isLoop = isLoop
         self.path = path
-        self.player = AudioPlayer(path: path)
+        self.player = AudioPlayer(path: path, isLoop: self.isLoop)
         self.player.parent = self
+        
     }
 }
 
@@ -42,12 +43,12 @@ struct PlayerData {
 class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var audioPlayer: AVAudioPlayer!
     var parent: PlayerData?
-    init(path:String) {
+    init(path:String, isLoop: Bool) {
         super.init()
         do {
-            
             let regularURL = path.replacingOccurrences(of: "file://", with: "")
             audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: regularURL))
+            audioPlayer.numberOfLoops = isLoop ? -1 : 0 // ループの設定
             audioPlayer.delegate = self
 //            audioPlayer.prepareToPlay() // バッファを読み込んでおく
         }
