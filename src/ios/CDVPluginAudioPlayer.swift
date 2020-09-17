@@ -226,8 +226,23 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["duration": duration])
         commandDelegate.send(result, callbackId: command.callbackId)
     }
+    
     // 現在時間の取得
     @objc func setCurrentTime(_ command: CDVInvokedUrlCommand) {
+        // データの生成
+        guard
+            let data = command.argument(at: 0) as? [String: Any],
+            let id = data["id"] as? Int,
+            let time = data["time"] as? Double,
+            let playerData = playerDataList[id] else {return}
+        playerData.player.setCurrentTime(time: time)
+        
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": time])
+        commandDelegate.send(result, callbackId: command.callbackId)
+    }
+    
+    // 現在時間の取得
+    @objc func getCurrentTime(_ command: CDVInvokedUrlCommand) {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
@@ -291,7 +306,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
+        result?.keepCallback = true 
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
