@@ -93,6 +93,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         
         guard let parent = self.parent else {return}
         NotificationCenter.default.post(name: .audioPlayerStop, object: nil, userInfo: ["playerData": parent])
+        NotificationCenter.default.post(name: .audioPlayerEnded, object: nil, userInfo: ["playerData": parent])
     }
     // 音声の再生が終了したら
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
@@ -290,6 +291,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
@@ -297,6 +299,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
@@ -304,6 +307,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.pauseCallbackId)
     }
     
@@ -311,6 +315,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.stopCallbackId)
     }
     
