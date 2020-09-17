@@ -122,7 +122,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     var playerDataList:[Int:PlayerData] = [:]
     var audioIndex: Int = 0
-    private var lock = NSRecursiveLock()
     
     @objc override func pluginInitialize() {
         // 通知登録 (play, pause, stop, ended)
@@ -135,15 +134,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidEnded(notification:)), name: NSNotification.Name.audioPlayerEnded, object: nil)
         playerDataList = [:]
         audioIndex = 0
-        lock = NSRecursiveLock()
     }
     
     // 作成
     @objc func create(_ command: CDVInvokedUrlCommand) {
-        // 作成終わるまで待つ
-        defer { lock.unlock() }
-        lock.lock()
-        
         let data = command.argument(at: 0) as! [String: Any]
         audioIndex = audioIndex + 1
         let id = audioIndex
