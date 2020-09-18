@@ -50,7 +50,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: regularURL))
             audioPlayer.numberOfLoops = isLoop ? -1 : 0 // ループの設定
             audioPlayer.delegate = self
-//            audioPlayer.prepareToPlay() // バッファを読み込んでおく
+            audioPlayer.prepareToPlay() // バッファを読み込んでおく
         }
         catch {
             // TODO:Error
@@ -58,19 +58,25 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func play() {
-        if (audioPlayer.isPlaying) {
-            return
-        }
-        audioPlayer.play()
-        trigger(name: .audioPlayerPlay)
+        // 即時再生はラグがあるので必ず0.1秒後に再生する
+        play(time: 0.1)
+    }
+    func showCurrentTime() {
+        let swiftUnixTime = Double(Date().timeIntervalSince1970)
+        print(audioPlayer.currentTime, swiftUnixTime, swiftUnixTime - audioPlayer.currentTime)
     }
     // 時間指定で再生開始する
     func play(time: Double) {
         if (audioPlayer.isPlaying) {
             return
         }
+        
+        Timer.scheduledTimer(withTimeInterval: time, repeats: false, block: { _ in
+            self.showCurrentTime()
+            self.trigger(name: .audioPlayerPlay)
+        })
+        
         audioPlayer.play(atTime: audioPlayer.deviceCurrentTime + time)
-        trigger(name: .audioPlayerPlay)
     }
     func pause() {
         if (!audioPlayer.isPlaying) {
@@ -93,6 +99,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         trigger(name: .audioPlayerEnded)
     }
+    
+    
     
     // secounds?
     func getDuration() -> TimeInterval {
@@ -135,6 +143,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         audioIndex = 0
     }
     
+    
+    // 作成
+    @objc func test(_ command: CDVInvokedUrlCommand) {
+        let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        commandDelegate.send(result, callbackId: command.callbackId)
+    }
+    
     // 作成
     @objc func create(_ command: CDVInvokedUrlCommand) {
         let data = command.argument(at: 0) as! [String: Any]
@@ -157,7 +172,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         }
 
     }
-    
     // 再生
     @objc func play(_ command: CDVInvokedUrlCommand) {
         // データの生成
@@ -169,19 +183,16 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         let player = playerData.player
         var time = data["time"] as? Double
 
-        let date: Date = Date()
         if (time != nil) {
-            let swiftUnixTime: Double = Double(date.timeIntervalSince1970)
-            let jsUnixTime: Double = data["timestamp"] as! Double
             // コマンド呼び出しのラグを修正
-            time! -= swiftUnixTime - jsUnixTime;
+            time! -= 0.0005;
             player.play(time: time ?? 0)
         }
         else {
             player.play()
         }
-        
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
+        let currentTime = player.getCurrentTime()
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": currentTime])
         commandDelegate.send(result, callbackId: command.callbackId)
     }
     // 一時停止
@@ -311,7 +322,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func audioDidPlay(notification: Notification) {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        
+        let player = playerData.player
+        let currentTime = player.getCurrentTime()
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": currentTime])
         result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }

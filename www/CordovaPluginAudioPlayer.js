@@ -1,13 +1,17 @@
 'use strict';
 
 const exec = require('cordova/exec');
+// native で 即時再生する際に 100 ms 送らせて再生する
+const START_TIME_LAG = 100;
 class AudioPlayerManager {
   constructor() {
   }
 
   async create({ path, isLoop }) {
+    await this.createAction('test');
     // id, path, duration
     const data = await this.createAction('create', { path, isLoop });
+
     const player = new AudioPlayer(data);
     return player;
   }
@@ -40,6 +44,7 @@ class AudioPlayer {
     this.path = path; // file path
     this.duration = duration; // 長さ
     this.paused = true;
+    this._currentTime = 0;
 
     this._listeners = {};
 
@@ -48,32 +53,67 @@ class AudioPlayer {
     this.registerEvents('pause', 'setOnPauseCallbackId', { id });
     this.registerEvents('stop', 'setOnStopCallbackId', { id });
     this.registerEvents('ended', 'setOnEndedCallbackId', { id });
-    this.on('ended', () => {
-      this.paused = true;
-    });
+    this._privateListeners = {
+      play: (e) => {
+        this._currentTime = e.currentTime;
+        this._startTime = performance.now();
+      },
+      ended: () => {
+        this.paused = true;
+        this._currentTime = 0;
+      },
+    };
   }
 
   // 音楽再生
   play(time) {
+    return this._play(time);
+  }
+  _play(time) {
     this.paused = false;
     if (time === undefined) {
+      this._startTime = performance.now() + START_TIME_LAG;
       return this.exec('play');
     }
+    this._startTime = performance.now() + time * 1000;
     return this.exec('play', { time });
   }
   // 音楽一時停止
   pause() {
+    if (this.paused) {
+      return;
+    }
+    this._currentTime = this.currentTime;
     this.paused = true;
     return this.exec('pause');
   }
-  // 音楽停止
+  // 音楽一時停止かつメモリバッファから音声データを破棄
   stop() {
+    if (!this.paused) {
+      this._currentTime = this.currentTime;
+    }
     this.paused = true;
     return this.exec('stop');
   }
+
+  get currentTime() {
+    if (this.paused) {
+      return this._currentTime;
+    }
+    return Math.max(0, this._currentTime + (performance.now() - this._startTime) / 1000);
+  }
+
+  // ネイティブにセットしてJSの値を更新する
+  set currentTime(time) {
+    this._currentTime = time;
+    this.setCurrentTime(time);
+  }
+
+  // ネイティブから currentTime を取得する
   getCurrentTime() {
     return this.exec('getCurrentTime');
   }
+  // ネイティブのプレイヤーに currentTime をセットする
   setCurrentTime(time) {
     return this.exec('setCurrentTime', { time });
   }
@@ -119,7 +159,6 @@ class AudioPlayer {
     return new Promise((resolve, reject) => {
       // actionが定義されているかを判定したい
       if (true) {
-        params.timestamp = Date.now() / 1000;
         // cordova 実行ファイルを登録
         exec(resolve, reject, 'CDVPluginAudioPlayer', action, [params]);
       }
@@ -131,15 +170,21 @@ class AudioPlayer {
 
   // TODO: メモリリークしないかチェック
   // イベントをバインド
-  registerEvents(onSuccess, action, params) {
+  registerEvents(eventName, action, params) {
     exec(
       (data) => {
-        this.trigger(onSuccess, data);
+        this._triggerPrivate(eventName, data);
+        this.trigger(eventName, data);
       },
       (error) => {
         console.log(error, 'error');
       }, 'CDVPluginAudioPlayer', action, [params]
     );
+  }
+
+  _triggerPrivate(eventName, data) {
+    const f = this._privateListeners[eventName];
+    f && f(data);
   }
 
 }
