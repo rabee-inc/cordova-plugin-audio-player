@@ -4,7 +4,7 @@ extension Notification.Name {
     static let audioPlayerPlay = Notification.Name("audioPlayerPlay")
     static let audioPlayerStop = Notification.Name("audioPlayerStop")
     static let audioPlayerPause = Notification.Name("audioPlayerPause")
-    static let audioPlayerEnded = Notification.Name("audioPlayerPause")
+    static let audioPlayerEnded = Notification.Name("audioPlayerEnded")
 }
 
 // player の wrapper クラス
@@ -64,7 +64,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
         audioPlayer.play()
-        NotificationCenter.default.post(name: .audioPlayerPlay, object: self.parent)
+        
+        guard let parent = self.parent else {return}
+        NotificationCenter.default.post(name: .audioPlayerPlay, object: nil, userInfo: ["playerData": parent])
     }
     // 時間指定で再生開始する
     func play(time: Double) {
@@ -307,7 +309,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true 
+        result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
     
