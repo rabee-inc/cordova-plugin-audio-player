@@ -58,15 +58,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func play() {
-        
-        
         if (audioPlayer.isPlaying) {
             return
         }
         audioPlayer.play()
-        
-        guard let parent = self.parent else {return}
-        NotificationCenter.default.post(name: .audioPlayerPlay, object: nil, userInfo: ["playerData": parent])
+        trigger(name: .audioPlayerPlay)
     }
     // 時間指定で再生開始する
     func play(time: Double) {
@@ -74,18 +70,14 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
         audioPlayer.play(atTime: audioPlayer.deviceCurrentTime + time)
-        
-        guard let parent = self.parent else {return}
-        NotificationCenter.default.post(name: .audioPlayerPlay, object: nil, userInfo: ["playerData": parent])
+        trigger(name: .audioPlayerPlay)
     }
     func pause() {
         if (!audioPlayer.isPlaying) {
             return
         }
         audioPlayer.pause()
-        
-        guard let parent = self.parent else {return}
-        NotificationCenter.default.post(name: .audioPlayerPause, object: nil, userInfo: ["playerData": parent])
+        trigger(name: .audioPlayerPause)
         
     }
     func stop() {
@@ -94,14 +86,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         }
         audioPlayer.stop()
         
-        guard let parent = self.parent else {return}
-        NotificationCenter.default.post(name: .audioPlayerStop, object: nil, userInfo: ["playerData": parent])
-        NotificationCenter.default.post(name: .audioPlayerEnded, object: nil, userInfo: ["playerData": parent])
+        trigger(name: .audioPlayerStop)
+        trigger(name: .audioPlayerEnded)
     }
     // 音声の再生が終了したら
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        guard let parent = self.parent else {return}
-        NotificationCenter.default.post(name: .audioPlayerEnded, object: nil, userInfo: ["playerData": parent])
+        trigger(name: .audioPlayerEnded)
     }
     
     // secounds?
@@ -115,6 +105,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     
     func getCurrentTime() -> TimeInterval {
         return audioPlayer.currentTime
+    }
+    
+    func trigger(name: Notification.Name) {
+        guard let parent = self.parent else {return}
+        NotificationCenter.default.post(name: name, object: nil, userInfo: ["playerData": parent])
     }
 }
 
