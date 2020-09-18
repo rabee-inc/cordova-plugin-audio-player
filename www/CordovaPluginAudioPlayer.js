@@ -1,44 +1,21 @@
 'use strict';
 
+const exec = require('cordova/exec');
 class AudioPlayerManager {
-  constructor(params) {
-    this.exec = require('cordova/exec');
-    this.players = [];
+  constructor() {
   }
 
-  async create({path, isLoop}) {
+  async create({ path, isLoop }) {
     // id, path, duration
-    const data = await this.createAction('create', {path, isLoop});
+    const data = await this.createAction('create', { path, isLoop });
     const player = new AudioPlayer(data);
-    this.players.push(player);
-  
     return player;
-  }
-
-  getPlayer({id}) {
-    return this.players.find((item) => item.id === id);
-  }
-  
-  async removePlayer({id}) {
-    await this.createAction('remove', {id})
-    const idx = this.players.findIndex((item) => item.id === id);
-    this.players.splice(idx, 1);
-    return true
-  }
-
-  async removeAll() {
-    const promises = this.players.map(player => {
-      return this.createAction('remove', {id: player.id});
-    })
-    await Promise.all(promises);
-    this.players = [];
-    return true
   }
 
   // cordova の実行ファイルを登録する
   registerCordovaExecuter(action, onSuccess, onFail, param) {
-    return this.exec(onSuccess, onFail, 'CDVPluginAudioPlayer', action, [param]);
-  };
+    return exec(onSuccess, onFail, 'CDVPluginAudioPlayer', action, [param]);
+  }
 
   // promise で返す。 cordova の excuter の wrapper
   createAction(action, params) {
@@ -52,53 +29,64 @@ class AudioPlayerManager {
         // TODO: error handling
       }
     });
-  };
+  }
 
 }
 
 class AudioPlayer {
 
-  constructor({id, path, duration}) {
+  constructor({ id, path, duration }) {
     this.id = id; // id
     this.path = path; // file path
     this.duration = duration; // 長さ
+    this.paused = true;
 
-
-    this.exec = require('cordova/exec');
     this._listeners = {};
 
     //　イベント登録
-    this.registerEvents('play', 'setOnPlayCallbackId', {id});
-    this.registerEvents('pause', 'setOnPauseCallbackId', {id});
-    this.registerEvents('stop', 'setOnStopCallbackId', {id});
-    this.registerEvents('ended', 'setOnEndedCallbackId', {id});
-
+    this.registerEvents('play', 'setOnPlayCallbackId', { id });
+    this.registerEvents('pause', 'setOnPauseCallbackId', { id });
+    this.registerEvents('stop', 'setOnStopCallbackId', { id });
+    this.registerEvents('ended', 'setOnEndedCallbackId', { id });
+    this.on('ended', () => {
+      this.paused = true;
+    });
   }
 
   // 音楽再生
   play(time) {
-    return this.createAction('play', {id: this.id, time});
+    this.paused = false;
+    if (time === undefined) {
+      return this.exec('play');
+    }
+    return this.exec('play', { time });
   }
   // 音楽一時停止
   pause() {
-    return this.createAction('pause', {id: this.id});
+    this.paused = true;
+    return this.exec('pause');
   }
   // 音楽停止
   stop() {
-    return this.createAction('stop', {id: this.id});
+    this.paused = true;
+    return this.exec('stop');
   }
   getCurrentTime() {
-    return this.createAction('getCurrentTime', {id: this.id});
+    return this.exec('getCurrentTime');
   }
   setCurrentTime(time) {
-    return this.createAction('setCurrentTime', {id: this.id, time});
+    return this.exec('setCurrentTime', { time });
+  }
+  close() {
+    return this.exec('close');
   }
 
-  // 登録関係
+  // 登録関係
   on(event, callback) {
     this._listeners[event] = this._listeners[event] || [];
     this._listeners[event].push(callback);
-  };
+  }
+
   off(event, callback) {
     if (!this._listeners[event]) this._listeners[event] = [];
     if (event && typeof callback === 'function') {
@@ -107,52 +95,52 @@ class AudioPlayer {
         this._listeners[event].splice(i, 1);
       }
     }
-  };
+  }
+
   trigger(event, value) {
     if (this._listeners[event]) {
-        this._listeners[event].forEach(callback => {
-          if (typeof callback === 'function') {
-            callback(value);
-          }
+      this._listeners[event].forEach(callback => {
+        if (typeof callback === 'function') {
+          callback(value);
+        }
       });
     }
-  };
-  clearEventListner(event) {
+  }
+
+  clearEventListener(event) {
     this._listeners[event] = [];
-  };
+  }
 
 
   // ========================== private 関数 ==============================================
   // promise で返す。 cordova の excuter の wrapper
-  createAction(action, params = {}) {
+  exec(action, params = {}) {
+    params.id = this.id;
     return new Promise((resolve, reject) => {
       // actionが定義されているかを判定したい
       if (true) {
         params.timestamp = Date.now() / 1000;
         // cordova 実行ファイルを登録
-        this.registerCordovaExecuter(action, resolve, reject, params);
+        exec(resolve, reject, 'CDVPluginAudioPlayer', action, [params]);
       }
       else {
         // TODO: error handling
       }
     });
-  };
-  // cordova の実行ファイルを登録する
-  registerCordovaExecuter(action, onSuccess, onFail, param) {
-    return this.exec(onSuccess, onFail, 'CDVPluginAudioPlayer', action, [param]);
-  };
-  
+  }
+
+  // TODO: メモリリークしないかチェック
   // イベントをバインド
   registerEvents(onSuccess, action, params) {
-    this.exec(
+    exec(
       (data) => {
         this.trigger(onSuccess, data);
-      }, 
+      },
       (error) => {
         console.log(error, 'error');
       }, 'CDVPluginAudioPlayer', action, [params]
     );
-  };
+  }
 
 }
 
