@@ -8,7 +8,6 @@ class AudioPlayerManager {
   }
 
   async create({ path, isLoop }) {
-    await this.createAction('test');
     // id, path, duration
     const data = await this.createAction('create', { path, isLoop });
 
@@ -36,7 +35,9 @@ class AudioPlayerManager {
   }
 
 }
-
+const EVENT_LISTENER_ERROR = (error) => {
+  console.log(error, 'error');
+};
 class AudioPlayer {
 
   constructor({ id, path, duration }) {
@@ -47,13 +48,7 @@ class AudioPlayer {
     this._currentTime = 0;
 
     this._listeners = {};
-
-    //　イベント登録
-    this.registerEvents('play', 'setOnPlayCallbackId', { id });
-    this.registerEvents('currenttimeupdate', 'setOnCurrentTimeUpdateCallbackId', { id });
-    this.registerEvents('pause', 'setOnPauseCallbackId', { id });
-    this.registerEvents('stop', 'setOnStopCallbackId', { id });
-    this.registerEvents('ended', 'setOnEndedCallbackId', { id });
+    // このクラス内でプライベート的に実行するイベント
     this._privateListeners = {
       currenttimeupdate: (e) => {
         this._currentTime = e.currentTime;
@@ -61,9 +56,34 @@ class AudioPlayer {
       },
       ended: () => {
         this.paused = true;
-        this._currentTime = 0;
+        this._currentTime = this.duration;
       },
     };
+
+    //　ネイティブからイベントを受け取れるようにして、対象の callbackId を保存しておく
+    Promise.all([
+      'play',
+      'currenttimeupdate',
+      'pause',
+      'stop',
+      'ended'
+    ].map(type => {
+      return new Promise((resolve) => {
+        exec(
+          (data) => {
+            if (data && data.isRegisterEvent) {
+              resolve(data.callbackId);
+              return;
+            }
+            this._triggerPrivate(type, data);
+            this.trigger(type, data);
+          },
+          EVENT_LISTENER_ERROR, 'CDVPluginAudioPlayer', 'addEventListener', [{ type, id }]
+        );
+      });
+    })).then((ids) => {
+      this._callbackIds = ids;
+    });
   }
 
   // 音楽再生
@@ -119,8 +139,17 @@ class AudioPlayer {
   setCurrentTime(time) {
     return this.exec('setCurrentTime', { time });
   }
+  // メモリから開放してこのクラスを使用できなくする
   close() {
-    return this.exec('close');
+    this.closed = true;
+    this.paused = true;
+    return this.exec('close').then(() => {
+      // イベントの削除
+      this._privateListeners = this._listeners = {};
+      this._callbackIds.forEach(callbackId => {
+        delete cordova.callbacks[callbackId];
+      });
+    });
   }
 
   // 登録関係
@@ -153,7 +182,6 @@ class AudioPlayer {
     this._listeners[event] = [];
   }
 
-
   // ========================== private 関数 ==============================================
   // promise で返す。 cordova の excuter の wrapper
   exec(action, params = {}) {
@@ -168,20 +196,6 @@ class AudioPlayer {
         // TODO: error handling
       }
     });
-  }
-
-  // TODO: メモリリークしないかチェック
-  // イベントをバインド
-  registerEvents(eventName, action, params) {
-    exec(
-      (data) => {
-        this._triggerPrivate(eventName, data);
-        this.trigger(eventName, data);
-      },
-      (error) => {
-        console.log(error, 'error');
-      }, 'CDVPluginAudioPlayer', action, [params]
-    );
   }
 
   _triggerPrivate(eventName, data) {
