@@ -63,6 +63,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         if (audioPlayer.isPlaying) {
             return
         }
+        do {
+           try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback)
+        }
+        catch {
+           
+        }
         // 最後の方から再生したら最初に戻す
         if audioPlayer.currentTime >= audioPlayer.duration - 0.05 {
             audioPlayer.currentTime = 0.0
