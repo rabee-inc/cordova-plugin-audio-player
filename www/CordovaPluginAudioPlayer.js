@@ -50,11 +50,12 @@ class AudioPlayer {
 
     //　イベント登録
     this.registerEvents('play', 'setOnPlayCallbackId', { id });
+    this.registerEvents('currenttimeupdate', 'setOnCurrentTimeUpdateCallbackId', { id });
     this.registerEvents('pause', 'setOnPauseCallbackId', { id });
     this.registerEvents('stop', 'setOnStopCallbackId', { id });
     this.registerEvents('ended', 'setOnEndedCallbackId', { id });
     this._privateListeners = {
-      play: (e) => {
+      currenttimeupdate: (e) => {
         this._currentTime = e.currentTime;
         this._startTime = performance.now();
       },
@@ -106,6 +107,7 @@ class AudioPlayer {
   // ネイティブにセットしてJSの値を更新する
   set currentTime(time) {
     this._currentTime = time;
+    this._startTime = performance.now();
     this.setCurrentTime(time);
   }
 

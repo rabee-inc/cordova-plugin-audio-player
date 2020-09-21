@@ -5,11 +5,12 @@ extension Notification.Name {
     static let audioPlayerStop = Notification.Name("audioPlayerStop")
     static let audioPlayerPause = Notification.Name("audioPlayerPause")
     static let audioPlayerEnded = Notification.Name("audioPlayerEnded")
+    static let audioPlayerCurrentTimeUpdate = Notification.Name("audioPlayerCurrentTimeUpdate")
 }
 
 // player の wrapper クラス
 struct PlayerData {
-    var id: Int
+    var id: UInt64
     var isLoop: Bool // ループするかどうか -> まだ未実装
     var player: AudioPlayer
     var path: String
@@ -21,8 +22,9 @@ struct PlayerData {
     var stopCallbackId: String?
     var endedCallbackId: String?
     var canPlayCallbackId: String?
+    var currentTimeUpdateCallbackId: String?
 
-    init(data: [String: Any], id: Int) throws {
+    init(data: [String: Any], id: UInt64) throws {
         guard
             let path = data["path"] as? String else {
                 throw NSError(domain: "initalize error", code: 1, userInfo: nil)
@@ -30,7 +32,6 @@ struct PlayerData {
         self.id = id
         let isLoop = data["isLoop"] as? Bool ?? false
         
-        self.id = id
         self.isLoop = isLoop
         self.path = path
         self.player = AudioPlayer(path: path, isLoop: self.isLoop)
@@ -61,10 +62,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // 即時再生はラグがあるので必ず0.1秒後に再生する
         play(time: 0.1)
     }
-    func showCurrentTime() {
-        let swiftUnixTime = Double(Date().timeIntervalSince1970)
-        print(audioPlayer.currentTime, swiftUnixTime, swiftUnixTime - audioPlayer.currentTime)
-    }
     // 時間指定で再生開始する
     func play(time: Double) {
         if (audioPlayer.isPlaying) {
@@ -72,8 +69,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         }
         
         Timer.scheduledTimer(withTimeInterval: time, repeats: false, block: { _ in
-            self.showCurrentTime()
             self.trigger(name: .audioPlayerPlay)
+            self.trigger(name: .audioPlayerCurrentTimeUpdate)
         })
         
         audioPlayer.play(atTime: audioPlayer.deviceCurrentTime + time)
@@ -109,6 +106,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     
     func setCurrentTime(time: Double) {
         audioPlayer.currentTime = time
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false, block: { _ in
+            self.trigger(name: .audioPlayerCurrentTimeUpdate)
+        })
     }
     
     func getCurrentTime() -> TimeInterval {
@@ -127,8 +127,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 // マネージャー的なやつ
 @objc(CDVPluginAudioPlayer) class CDVPluginAudioPlayer: CDVPlugin {
 
-    var playerDataList:[Int:PlayerData] = [:]
-    var audioIndex: Int = 0
+    var playerDataList:[UInt64:PlayerData] = [:]
+    var audioIndex: UInt64 = 0
     
     @objc override func pluginInitialize() {
         // 通知登録 (play, pause, stop, ended)
@@ -139,6 +139,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidStop(notification:)), name: NSNotification.Name.audioPlayerStop, object: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioDidEnded(notification:)), name: NSNotification.Name.audioPlayerEnded, object: nil)
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.audioCurrentTimeUpdate(notification:)), name: NSNotification.Name.audioPlayerCurrentTimeUpdate, object: nil)
         playerDataList = [:]
         audioIndex = 0
     }
@@ -154,7 +156,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func create(_ command: CDVInvokedUrlCommand) {
         let data = command.argument(at: 0) as! [String: Any]
         audioIndex = audioIndex + 1
-        let id = audioIndex
+        let id:UInt64 = audioIndex
         do {
             var playerData = try PlayerData(data: data, id: id);
             playerData.delegate = self
@@ -177,7 +179,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -191,8 +193,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         else {
             player.play()
         }
-        let currentTime = player.getCurrentTime()
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": currentTime])
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
         commandDelegate.send(result, callbackId: command.callbackId)
     }
     // 一時停止
@@ -200,7 +201,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -214,7 +215,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let playerData = playerDataList[id] else {return}
         
         let player = playerData.player
@@ -228,7 +229,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let playerData = playerDataList[id] else {return}
         
         let duration = playerData.player.getDuration()
@@ -241,12 +242,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let time = data["time"] as? Double,
             let playerData = playerDataList[id] else {return}
         playerData.player.setCurrentTime(time: time)
         
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": time])
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
         commandDelegate.send(result, callbackId: command.callbackId)
     }
     
@@ -255,7 +256,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // データの生成
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             let playerData = playerDataList[id] else {return}
         
         let time = playerData.player.getCurrentTime()
@@ -267,7 +268,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnPlayCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             var playerData = playerDataList[id] else {return}
         playerData.playCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -276,7 +277,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnPauseCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             var playerData = playerDataList[id] else {return}
         playerData.pauseCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -285,7 +286,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnStopCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             var playerData = playerDataList[id] else {return}
         playerData.stopCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -294,7 +295,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnEndedCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             var playerData = playerDataList[id] else {return}
         playerData.endedCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
@@ -303,9 +304,18 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func setOnCanPlayCallbackId(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? Int,
+            let id = data["id"] as? UInt64,
             var playerData = playerDataList[id] else {return}
         playerData.canPlayCallbackId = command.callbackId
+        playerDataList.updateValue(playerData, forKey: id)
+        
+    }
+    @objc func setOnCurrentTimeUpdateCallbackId(_ command: CDVInvokedUrlCommand) {
+        guard
+            let data = command.argument(at: 0) as? [String: Any],
+            let id = data["id"] as? UInt64,
+            var playerData = playerDataList[id] else {return}
+        playerData.currentTimeUpdateCallbackId = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
         
     }
@@ -322,10 +332,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     @objc func audioDidPlay(notification: Notification) {
         guard let data = notification.userInfo?["playerData"] as? PlayerData,
             let playerData = playerDataList[data.id] else {return}
-        
-        let player = playerData.player
-        let currentTime = player.getCurrentTime()
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": currentTime])
+        let result = CDVPluginResult(status: CDVCommandStatus_OK)
         result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.playCallbackId)
     }
@@ -352,6 +359,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         let result = CDVPluginResult(status: CDVCommandStatus_OK)
         result?.keepCallback = true
         commandDelegate.send(result, callbackId: playerData.endedCallbackId)
+    }
+    @objc func audioCurrentTimeUpdate(notification: Notification) {
+        guard let data = notification.userInfo?["playerData"] as? PlayerData,
+            let playerData = playerDataList[data.id] else {return}
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": playerData.player.getCurrentTime()])
+        result?.keepCallback = true
+        commandDelegate.send(result, callbackId: playerData.currentTimeUpdateCallbackId)
     }
     
 }
