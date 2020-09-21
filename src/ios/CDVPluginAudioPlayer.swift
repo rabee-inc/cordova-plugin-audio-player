@@ -17,12 +17,7 @@ struct PlayerData {
     var isDownload: Bool = false
     var delegate: CDVPluginAudioPlayer?
     // イベントコールバックid
-    var playCallbackId: String?
-    var pauseCallbackId: String?
-    var stopCallbackId: String?
-    var endedCallbackId: String?
-    var canPlayCallbackId: String?
-    var currentTimeUpdateCallbackId: String?
+    var eventListenerCallbackIds: [String:String]
 
     init(data: [String: Any], id: UInt64) throws {
         guard
@@ -30,6 +25,7 @@ struct PlayerData {
                 throw NSError(domain: "initalize error", code: 1, userInfo: nil)
         }
         self.id = id
+        self.eventListenerCallbackIds = [:]
         let isLoop = data["isLoop"] as? Bool ?? false
         
         self.isLoop = isLoop
@@ -101,8 +97,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         trigger(name: .audioPlayerEnded)
     }
     
-    
-    
     // secounds?
     func getDuration() -> TimeInterval {
         return audioPlayer.duration
@@ -123,6 +117,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     
     func getCurrentTime() -> TimeInterval {
         return audioPlayer.currentTime
+    }
+    
+    func close() {
+        audioPlayer.stop()
+        // MEMO: 不要なら消す
+        audioPlayer.delegate = nil
     }
     
     func trigger(name: Notification.Name) {
@@ -153,13 +153,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(self.audioCurrentTimeUpdate(notification:)), name: NSNotification.Name.audioPlayerCurrentTimeUpdate, object: nil)
         playerDataList = [:]
         audioIndex = 0
-    }
-    
-    
-    // 作成
-    @objc func test(_ command: CDVInvokedUrlCommand) {
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        commandDelegate.send(result, callbackId: command.callbackId)
     }
     
     // 作成
@@ -274,108 +267,85 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         commandDelegate.send(result, callbackId: command.callbackId)
     }
     
+    // メモリから削除
+    @objc func close(_ command: CDVInvokedUrlCommand) {
+        // データの生成
+        guard
+            let data = command.argument(at: 0) as? [String: Any],
+            let id = data["id"] as? UInt64,
+            let playerData = playerDataList[id] else {return}
+        let player = playerData.player
+        player.close()
+        playerDataList.removeValue(forKey: id)
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
+        commandDelegate.send(result, callbackId: command.callbackId)
+    }
+    
     // callback id 周りの登録関数
-    @objc func setOnPlayCallbackId(_ command: CDVInvokedUrlCommand) {
+    @objc func addEventListener(_ command: CDVInvokedUrlCommand) {
         guard
             let data = command.argument(at: 0) as? [String: Any],
             let id = data["id"] as? UInt64,
+            let type = data["type"] as? String,
             var playerData = playerDataList[id] else {return}
-        playerData.playCallbackId = command.callbackId
+        playerData.eventListenerCallbackIds[type] = command.callbackId
         playerDataList.updateValue(playerData, forKey: id)
         
-    }
-    @objc func setOnPauseCallbackId(_ command: CDVInvokedUrlCommand) {
-        guard
-            let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? UInt64,
-            var playerData = playerDataList[id] else {return}
-        playerData.pauseCallbackId = command.callbackId
-        playerDataList.updateValue(playerData, forKey: id)
-        
-    }
-    @objc func setOnStopCallbackId(_ command: CDVInvokedUrlCommand) {
-        guard
-            let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? UInt64,
-            var playerData = playerDataList[id] else {return}
-        playerData.stopCallbackId = command.callbackId
-        playerDataList.updateValue(playerData, forKey: id)
-        
-    }
-    @objc func setOnEndedCallbackId(_ command: CDVInvokedUrlCommand) {
-        guard
-            let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? UInt64,
-            var playerData = playerDataList[id] else {return}
-        playerData.endedCallbackId = command.callbackId
-        playerDataList.updateValue(playerData, forKey: id)
-        
-    }
-    @objc func setOnCanPlayCallbackId(_ command: CDVInvokedUrlCommand) {
-        guard
-            let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? UInt64,
-            var playerData = playerDataList[id] else {return}
-        playerData.canPlayCallbackId = command.callbackId
-        playerDataList.updateValue(playerData, forKey: id)
-        
-    }
-    @objc func setOnCurrentTimeUpdateCallbackId(_ command: CDVInvokedUrlCommand) {
-        guard
-            let data = command.argument(at: 0) as? [String: Any],
-            let id = data["id"] as? UInt64,
-            var playerData = playerDataList[id] else {return}
-        playerData.currentTimeUpdateCallbackId = command.callbackId
-        playerDataList.updateValue(playerData, forKey: id)
-        
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["isRegisterEvent": true, "callbackId": command.callbackId])
+        result?.keepCallback = true
+        commandDelegate.send(result, callbackId: command.callbackId)
     }
     
     // 通知受け取り関数
+    func getPlayerData(notification: Notification) -> PlayerData! {
+        let data = notification.userInfo?["playerData"] as? PlayerData
+        return playerDataList[data!.id]
+    }
+    
+    func sendResult(playerData: PlayerData, type: String) {
+        sendResult(playerData: playerData, type: type, messageAs: nil)
+    }
+    
+    func sendResult(playerData: PlayerData, type: String, messageAs: [AnyHashable : Any]!) {
+        let result: CDVPluginResult
+        if (messageAs == nil) {
+            result = CDVPluginResult(status: CDVCommandStatus_OK)
+        }
+        else {
+            result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: messageAs)
+        }
+        result.keepCallback = true
+        commandDelegate.send(result, callbackId: playerData.eventListenerCallbackIds[type])
+    }
+    
     @objc func audioDidCanPlay(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.playCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "play")
     }
     
     @objc func audioDidPlay(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.playCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "play")
     }
     
     @objc func audioDidPause(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.pauseCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "pause")
     }
     
     @objc func audioDidStop(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.stopCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "stop")
     }
     
     @objc func audioDidEnded(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.endedCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "ended")
     }
+    
     @objc func audioCurrentTimeUpdate(notification: Notification) {
-        guard let data = notification.userInfo?["playerData"] as? PlayerData,
-            let playerData = playerDataList[data.id] else {return}
-        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: ["currentTime": playerData.player.getCurrentTime()])
-        result?.keepCallback = true
-        commandDelegate.send(result, callbackId: playerData.currentTimeUpdateCallbackId)
+        guard let playerData = getPlayerData(notification: notification) else {return}
+        sendResult(playerData: playerData, type: "currenttimeupdate", messageAs: ["currentTime": playerData.player.getCurrentTime()])
     }
     
 }
