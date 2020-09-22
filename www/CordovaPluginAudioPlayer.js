@@ -141,6 +141,9 @@ class AudioPlayer {
   }
   // メモリから開放してこのクラスを使用できなくする
   close() {
+    if (this.closed) {
+      return Promise.resolve();
+    }
     this.closed = true;
     this.paused = true;
     return this.exec('close').then(() => {
