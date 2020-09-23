@@ -109,12 +109,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func setCurrentTime(time: Double) {
-        let currentTime = min(time, audioPlayer.duration)
+        // 勝手に最初に戻ってしまうので 0.05 秒までシーク
+        let currentTime = min(time, audioPlayer.duration - 0.05)
         audioPlayer.currentTime = currentTime
-        // 最初まで戻ってしまうことがあるのでもう一度代入する
-        if currentTime != 0.0 && self.audioPlayer.currentTime == 0.0 {
-            self.audioPlayer.currentTime = currentTime - 0.05
-        }
         // 0.1秒後に正確なcurrentTimeをjsに送信
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false, block: { _ in
             self.trigger(name: .audioPlayerCurrentTimeUpdate)
