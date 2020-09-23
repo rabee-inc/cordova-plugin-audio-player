@@ -64,7 +64,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
         do {
-           try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback)
+           try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayAndRecord)
         }
         catch {
            
