@@ -44,14 +44,16 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         super.init()
         do {
             let regularURL = path.replacingOccurrences(of: "file://", with: "")
-            audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: regularURL))
+            let url = URL(string: regularURL)
+            audioPlayer = try AVAudioPlayer(contentsOf: url!)
             audioPlayer.numberOfLoops = isLoop ? -1 : 0 // ループの設定
             audioPlayer.delegate = self
             audioPlayer.prepareToPlay() // バッファを読み込んでおく
         }
-        catch {
-            // TODO:Error
+        catch let error {
+            print(error)
         }
+        
     }
     
     func play() {
