@@ -40,6 +40,7 @@ struct PlayerData {
 class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var audioPlayer: AVAudioPlayer!
     var parent: PlayerData?
+    var available = false
     init(path:String, isLoop: Bool) {
         super.init()
         do {
@@ -49,6 +50,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             audioPlayer.numberOfLoops = isLoop ? -1 : 0 // ループの設定
             audioPlayer.delegate = self
             audioPlayer.prepareToPlay() // バッファを読み込んでおく
+            available = true
         }
         catch let error {
             print(error)
@@ -128,6 +130,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         audioPlayer.stop()
         // MEMO: 不要なら消す
         audioPlayer.delegate = nil
+        parent = nil
+        available = false
     }
     
     func trigger(name: Notification.Name) {
@@ -168,14 +172,20 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         do {
             var playerData = try PlayerData(data: data, id: id);
             playerData.delegate = self
-            playerDataList.updateValue(playerData, forKey: playerData.id)
-            let data = [
-                "id": playerData.id,
-                "path": playerData.path as Any,
-                "duration": playerData.player.getDuration(),
-            ] as [String : Any]
-            let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: data)
-            commandDelegate.send(result, callbackId: command.callbackId)
+            if playerData.player.available {
+                playerDataList.updateValue(playerData, forKey: playerData.id)
+                let data = [
+                    "id": playerData.id,
+                    "path": playerData.path as Any,
+                    "duration": playerData.player.getDuration(),
+                ] as [String : Any]
+                let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: data)
+                commandDelegate.send(result, callbackId: command.callbackId)
+            }
+            else {
+                let result = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: data)
+                commandDelegate.send(result, callbackId: command.callbackId)
+            }
         }
         catch {
             // TODO: error handling
