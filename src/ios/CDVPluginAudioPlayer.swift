@@ -68,11 +68,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
         do {
-            try AVAudioSession.sharedInstance().setCategory(
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(
                 AVAudioSessionCategoryPlayAndRecord,
                 mode: AVAudioSessionModeDefault,
                 options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay]
             )
+            try audioSession.overrideOutputAudioPort(AVAudioSessionPortOverride.speaker)
         }
         catch {
            
