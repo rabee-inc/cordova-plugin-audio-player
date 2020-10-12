@@ -72,9 +72,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             try audioSession.setCategory(
                 AVAudioSessionCategoryPlayAndRecord,
                 mode: AVAudioSessionModeDefault,
-                options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay]
+                options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay, .defaultToSpeaker]
             )
-            try audioSession.overrideOutputAudioPort(AVAudioSessionPortOverride.speaker)
         }
         catch {
            
