@@ -1,7 +1,6 @@
 package jp.rabee
 
 import android.content.IntentFilter
-import com.google.gson.GsonBuilder
 import org.apache.cordova.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -69,12 +68,6 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
         return result
     }
 
-    // プレイヤーの再生スタート
-    private fun start(callbackContext: CallbackContext, params: JSONArray): Boolean {
-        cordova.activity.run {}
-        return true
-    }
-
     private fun create(callbackContext: CallbackContext, param: JSONArray): Boolean {
         val data = param.getJSONObject(0) ?: return false
         val path = data.getString("path") ?: return false
@@ -84,9 +77,8 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
         // player 生成
         val audioPlayer = AudioPlayer(this.cordova.context, playerId, isLoop, path)
         playerList[playerId] = audioPlayer
-
-        // success
-        sendSuccessCallback(callbackContext)
+        val result = PluginResult(PluginResult.Status.OK, JSONObject(mutableMapOf("id" to playerId, "path" to path, "duration" to audioPlayer.duration())))
+        callbackContext.sendPluginResult(result)
         return true
     }
     private fun play(callbackContext: CallbackContext, param: JSONArray): Boolean {
