@@ -5,6 +5,8 @@ import android.media.MediaPlayer
 import android.net.Uri
 import org.apache.cordova.CallbackContext
 import org.apache.cordova.PluginResult
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import kotlin.math.round
 
@@ -49,6 +51,7 @@ class AudioPlayer(
         }
         this.player.start()
         sendPluginResultEvent("play")
+        sendPluginResultEvent("currenttimeupdate", JSONObject(mutableMapOf("currentTime" to currentTime())))
     }
     fun pause() {
         if (!this.player.isPlaying) {
@@ -83,12 +86,22 @@ class AudioPlayer(
         callbacks.add(callbackContext)
         eventListenerCallbacks[type] = callbacks
     }
-    private fun sendPluginResultEvent(type: String) {
+    private fun sendPluginResultEvent(type: String, args: JSONObject?) {
         val callbacks = this.eventListenerCallbacks[type]
         callbacks?.forEach {
-            val p = PluginResult(PluginResult.Status.OK)
+            var p :PluginResult
+            if (args == null) {
+                p = PluginResult(PluginResult.Status.OK)
+            }
+            else {
+                p = PluginResult(PluginResult.Status.OK, args)
+            }
             p.keepCallback = true
             it.sendPluginResult(p)
         }
+    }
+
+    private fun sendPluginResultEvent(type: String) {
+        sendPluginResultEvent(type, null)
     }
 }
