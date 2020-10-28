@@ -70,8 +70,10 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
 
     private fun create(callbackContext: CallbackContext, param: JSONArray): Boolean {
         val data = param.getJSONObject(0) ?: return false
+
         val path = data.getString("path") ?: return false
-        val isLoop = data.getBoolean("isLoop") ?: return false
+
+        val isLoop = if (data.has("isLoop"))  data.getBoolean("isLoop") else false
 
         playerId++
         // player 生成
@@ -111,6 +113,7 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
         val currentTime = audioPlayer.currentTime()
         val data = JSONObject(mapOf("currentTime" to currentTime))
         val p = PluginResult(PluginResult.Status.OK, data)
+        callbackContext.sendPluginResult(p)
         return true
     }
     private fun setCurrentTime(callbackContext: CallbackContext, param: JSONArray): Boolean {

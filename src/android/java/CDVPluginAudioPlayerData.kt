@@ -21,8 +21,10 @@ class AudioPlayer(
     private val eventListenerCallbacks: MutableMap<String, MutableList<CallbackContext>> = mutableMapOf()
 
     init {
+        // file:// から始まるが、uri 変換の時におかしくなるので、切り取る
+        val file = File(path.replace("file://", ""))
+        if (file.exists()) print("exist!!!") // 一応存在チェック
 
-        val file = File(path)
         val uri = Uri.fromFile(file)
         this.player = MediaPlayer.create(context, uri)
         this.player.isLooping = isLoop
@@ -67,7 +69,10 @@ class AudioPlayer(
         sendPluginResultEvent("close")
     }
     fun setEventCallback(type: String, callbackContext: CallbackContext) {
-        val callbacks = eventListenerCallbacks[type] ?: return
+        var callbacks = eventListenerCallbacks[type]
+        if (callbacks.isNullOrEmpty()) {
+            callbacks = mutableListOf()
+        }
         callbacks.add(callbackContext)
         eventListenerCallbacks[type] = callbacks
     }

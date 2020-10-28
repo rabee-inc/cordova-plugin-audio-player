@@ -12,7 +12,7 @@
     <!-- Android -->
   <platform name="android" kotlin="1.3.60">
    <config-file target="res/xml/config.xml" parent="/*">
-      <feature name="NativeVideoPlayer">
+      <feature name="CDVPluginAudioPlayer">
         <param name="android-package" value="jp.rabee.CDVPluginAudioPlayer"/>
         <param name="onload" value="true" />
       </feature>
