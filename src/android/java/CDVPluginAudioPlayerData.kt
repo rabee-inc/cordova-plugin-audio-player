@@ -6,7 +6,7 @@ import android.net.Uri
 import org.apache.cordova.CallbackContext
 import org.apache.cordova.PluginResult
 import java.io.File
-
+import kotlin.math.round
 
 
 class AudioPlayer(
@@ -44,25 +44,32 @@ class AudioPlayer(
     }
 
     fun play() {
+        if (this.player.isPlaying) {
+            return
+        }
         this.player.start()
         sendPluginResultEvent("play")
     }
     fun pause() {
+        if (!this.player.isPlaying) {
+            return
+        }
         this.player.pause()
         sendPluginResultEvent("pause")
     }
     fun stop() {
         this.player.stop()
         sendPluginResultEvent("stop")
+        sendPluginResultEvent("ended")
     }
-    fun duration(): Int {
-        return this.player.duration
+    fun duration(): Float {
+        return this.player.duration / 1000f
     }
-    fun currentTime(): Int {
-        return this.player.currentPosition
+    fun currentTime(): Float {
+        return this.player.currentPosition / 1000f
     }
-    fun setCurrenttTime(time: Int) {
-        this.player.seekTo(time)
+    fun setCurrentTime(time: Double) {
+        this.player.seekTo(round(time * 1000).toInt())
     }
     fun close() {
         this.player.release()

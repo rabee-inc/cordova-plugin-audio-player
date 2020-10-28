@@ -118,8 +118,8 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
     }
     private fun setCurrentTime(callbackContext: CallbackContext, param: JSONArray): Boolean {
         val audioPlayer = getPlayerFromParam(param) ?: return false
-        val time = param.getJSONObject(0).getInt("time") ?: return false
-        audioPlayer.setCurrenttTime(time)
+        val time = param.getJSONObject(0).getDouble("time") ?: return false
+        audioPlayer.setCurrentTime(time)
         return true
     }
     private fun close(callbackContext: CallbackContext, param: JSONArray): Boolean {
