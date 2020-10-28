@@ -48,6 +48,9 @@ class AudioPlayer {
     this._currentTime = 0;
 
     this._listeners = {};
+
+    this._callbackIds = [];
+
     // このクラス内でプライベート的に実行するイベント
     this._privateListeners = {
       currenttimeupdate: (e) => {
