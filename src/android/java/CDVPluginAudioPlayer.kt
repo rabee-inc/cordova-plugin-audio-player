@@ -86,6 +86,7 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
     private fun play(callbackContext: CallbackContext, param: JSONArray): Boolean {
         val audioPlayer = getPlayerFromParam(param) ?: return false
         audioPlayer.play()
+        sendSuccessCallback(callbackContext)
         return true
     }
     private fun pause(callbackContext: CallbackContext, param: JSONArray): Boolean {
@@ -120,6 +121,7 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
         val audioPlayer = getPlayerFromParam(param) ?: return false
         val time = param.getJSONObject(0).getDouble("time") ?: return false
         audioPlayer.setCurrentTime(time)
+        sendSuccessCallback(callbackContext)
         return true
     }
     private fun close(callbackContext: CallbackContext, param: JSONArray): Boolean {
@@ -128,6 +130,7 @@ class CDVPluginAudioPlayer : CordovaPlugin() {
         audioPlayer.stop()
         audioPlayer.close() // player を終了
         playerList.remove(id) // list から削除
+        sendSuccessCallback(callbackContext)
         return true
     }
 
